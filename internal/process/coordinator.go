@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wyw14/cry-97/internal/aeration"
 	"github.com/wyw14/cry-97/internal/alarm"
+	"github.com/wyw14/cry-97/internal/chain"
 	"github.com/wyw14/cry-97/internal/discharge"
 	"github.com/wyw14/cry-97/internal/dosing"
 	"github.com/wyw14/cry-97/internal/intake"
@@ -38,6 +39,7 @@ type Plant struct {
 	labResults    *lab.Results
 	permits       *discharge.PermitBook
 	valves        *discharge.ValveController
+	chains        *chain.Book
 	alarms        *alarm.Service
 	settling      map[model.LineID]*settling.State
 	cycles        *settling.CycleBook
@@ -116,6 +118,7 @@ func NewPlant(dataDir string, lines []model.LineID, now func() time.Time) (*Plan
 	if err != nil {
 		return nil, err
 	}
+	chains := chain.NewBook()
 	pumps, err := sludge.NewPumpController(pumpList)
 	if err != nil {
 		return nil, err
@@ -145,6 +148,7 @@ func NewPlant(dataDir string, lines []model.LineID, now func() time.Time) (*Plan
 		lineBatches: make(map[model.LineID]uuid.UUID), store: store, snapshots: snapshots,
 		intake: intakeController, equalizers: pool, aeration: aerationController, dosing: dosingService,
 		labResults: lab.NewResults(), permits: permits, valves: valves, alarms: alarm.NewService(),
+		chains:   chains,
 		settling: make(map[model.LineID]*settling.State), cycles: settling.NewCycleBook(),
 		interlocks: arbiter, drains: drains, pumps: pumps, handovers: sludge.NewHandoverBook(),
 		sequences: sequences, compensations: queue, devices: devices, sampler: sampler, receiver: receiver,

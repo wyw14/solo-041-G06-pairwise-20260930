@@ -6,17 +6,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/wyw14/cry-97/internal/model"
 )
 
 type Sampler struct {
 	mu        sync.RWMutex
 	latest    map[model.LineID]map[model.SampleKind]model.Sample
+	byID      map[uuid.UUID]model.Sample
 	listeners []func(model.Sample)
 }
 
 func NewSampler() *Sampler {
-	return &Sampler{latest: make(map[model.LineID]map[model.SampleKind]model.Sample)}
+	return &Sampler{
+		latest: make(map[model.LineID]map[model.SampleKind]model.Sample),
+		byID:   make(map[uuid.UUID]model.Sample),
+	}
 }
 
 func (s *Sampler) Subscribe(listener func(model.Sample)) error {
@@ -45,12 +50,21 @@ func (s *Sampler) Publish(sample model.Sample) error {
 		return nil
 	}
 	byKind[sample.Kind] = sample
+	s.byID[sample.ID] = sample
 	listeners := append([]func(model.Sample){}, s.listeners...)
 	s.mu.Unlock()
 	for _, listener := range listeners {
 		listener(sample)
 	}
 	return nil
+}
+
+// Sample 返回已发布过的某条传感器样本。
+func (s *Sampler) Sample(id uuid.UUID) (model.Sample, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sample, ok := s.byID[id]
+	return sample, ok
 }
 
 func (s *Sampler) LineSnapshot(lineID model.LineID) []model.Sample {

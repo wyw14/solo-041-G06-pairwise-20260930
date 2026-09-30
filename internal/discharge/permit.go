@@ -69,6 +69,28 @@ func (b *PermitBook) ApplyResult(result model.LabResult, now time.Time) (Permit,
 	return permit, nil
 }
 
+// InvalidateSample 因样本丢失或撤销而吊销由该样本支撑的出水许可，并保持阀门关闭。
+// 若批次许可是由另一条仍有效样本支撑的，则不受牵连。批次本就没有匹配的有效许可时为空操作。
+func (b *PermitBook) InvalidateSample(batchID, sampleID uuid.UUID, now time.Time) (Permit, bool, error) {
+	b.mu.Lock()
+	permit, exists := b.byBatch[batchID]
+	if !exists || !permit.Active || permit.SampleID != sampleID {
+		b.mu.Unlock()
+		return Permit{}, false, nil
+	}
+	lineID := permit.LineID
+	stamp := now.UTC()
+	permit.Active = false
+	permit.RevokedAt = &stamp
+	b.byBatch[batchID] = permit
+	if err := b.valves.Hold(lineID, now); err != nil {
+		b.mu.Unlock()
+		return Permit{}, false, err
+	}
+	b.mu.Unlock()
+	return permit, true, nil
+}
+
 func (b *PermitBook) Current(batchID uuid.UUID) (Permit, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

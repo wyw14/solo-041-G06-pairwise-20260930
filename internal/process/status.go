@@ -23,6 +23,7 @@ type LineStatus struct {
 	Dose          *dosing.Change         `json:"dose,omitempty"`
 	LabResult     *model.LabResult       `json:"lab_result,omitempty"`
 	Permit        *discharge.Permit      `json:"permit,omitempty"`
+	Chains        []model.SamplingTask   `json:"chains"`
 	Cycle         *settling.Cycle        `json:"cycle,omitempty"`
 	Handover      *sludge.Handover       `json:"handover,omitempty"`
 	Sequence      *sludge.Sequence       `json:"sequence,omitempty"`
@@ -46,9 +47,11 @@ func (p *Plant) Status(lineID model.LineID) (LineStatus, error) {
 	var dose *dosing.Change
 	var labResult *model.LabResult
 	var permit *discharge.Permit
+	var chains []model.SamplingTask
 	if value, hasBatch := p.ActiveBatch(lineID); hasBatch {
 		batchID := value.ID
 		batch = &value
+		chains = p.chains.ByBatch(batchID)
 		if doseValue, found := p.dosing.Latest(batchID); found {
 			dose = &doseValue
 		}
@@ -86,7 +89,8 @@ func (p *Plant) Status(lineID model.LineID) (LineStatus, error) {
 	}
 	return LineStatus{
 		Line: line, Batch: batch, Intake: admission, Equalizers: p.equalizers.Snapshot(), Dose: dose, LabResult: labResult, Permit: permit,
-		Cycle: cycle, Handover: handover, Sequence: sequence, Settling: settlingState.Snapshot(),
+		Chains: chains,
+		Cycle:  cycle, Handover: handover, Sequence: sequence, Settling: settlingState.Snapshot(),
 		Samples: p.sampler.LineSnapshot(lineID), SampleCursor: p.receiver.Current(lineID),
 		Compensations: p.compensations.Pending(),
 		Pumps:         filterPumps(p.pumps.Snapshot(), lineID), Blowers: p.aeration.Blowers(),

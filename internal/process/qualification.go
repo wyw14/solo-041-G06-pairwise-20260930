@@ -36,6 +36,17 @@ func (p *Plant) ApplyLabResult(ctx context.Context, result model.LabResult, now 
 	if !result.Valid || result.BatchID == uuid.Nil {
 		return QualificationOutcome{}, errors.New("invalid lab result cannot qualify a batch")
 	}
+	// 结果只能匹配有效送检链条中的样本：无链条、未接收、丢失或撤销一律拒绝。
+	task, ok := p.chains.ValidForLab(result.SampleID)
+	if !ok {
+		return QualificationOutcome{}, errors.New("sample is not on a valid received sampling chain")
+	}
+	if task.BatchID != result.BatchID {
+		return QualificationOutcome{}, errors.New("lab result batch does not match sampling chain")
+	}
+	if task.LineID != result.LineID {
+		return QualificationOutcome{}, errors.New("lab result line does not match sampling chain")
+	}
 	p.mu.Lock()
 	batch, exists := p.batches[result.BatchID]
 	if !exists {
